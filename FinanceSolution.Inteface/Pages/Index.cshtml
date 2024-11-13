@@ -1,0 +1,357 @@
+﻿@page
+@model FinanceSolution.Inteface.Pages.IndexModel
+@{
+    ViewData["Title"] = "";
+    Layout = "~/Pages/Shared/_Layout.cshtml";
+}
+
+@Html.AntiForgeryToken()
+
+<div class="row">
+
+    @* Total *@
+    <div class="col-md-3 col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title text-black">Saldo Total</h3>
+                <div class="d-inline-block">
+                    <h2 class="text-black">@Model.Amount</h2>
+                    <p class="text-black mb-0">@Model.Date</p>
+                </div>
+                <span class="float-right display-5 opacity-5"><i class="fa fa-balance-scale"></i></i></span>
+            </div>
+        </div>
+    </div>
+
+    @* *@
+    <div class="col-md-3 col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title text-black">Entrada</h3>
+                <div class="d-inline-block">
+                    <h2 class="text-black">@Model.CashIn</h2>
+                    <p class="text-black mb-0">@Model.Date</p>
+                </div>
+                <span class="float-right display-5 opacity-5"><i class="fa fa-chevron-up"
+                        style="color: green;"></i></span>
+            </div>
+        </div>
+    </div>
+
+    @* *@
+    <div class="col-md-3 col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title text-black">Saida</h3>
+                <div class="d-inline-block">
+                    <h2 class="text-black">@Model.CashOut</h2>
+                    <p class="text-black mb-0">@Model.Date</p>
+                </div>
+                <span class="float-right display-5 opacity-5"><i class="fa fa-chevron-down"
+                        style="color: red;"></i></i></span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="row">
+
+    @* Total *@
+    <div class="col-md-12 col-sm-12">
+        <div class="card">
+            <div class="card-header bg-white mt-2">
+                <h4 class="card-title">Grafico de Entrada e Saida</h4>
+                <h6 class="card-subtitle text-muted">@Model.Date</h6>
+            </div>
+            <div style="padding: 0px 10px 10px 10px;">
+                <canvas id="chart-area-graph" height="90px" class="chartjs-render-monitor"></canvas>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="row">
+
+    @* Grafico de Entrada *@
+    <div class="col-md-6 col-sm-6">
+        <div class="card">
+            <div class="card-header bg-white mt-2">
+                <h4 class="card-title">Grafico de Entrada</h4>
+                <h6 class="card-subtitle text-muted">@Model.Date</h6>
+            </div>
+            <div style="padding: 0px 20px 20px 20px;">
+                <canvas id="chart-pizza-in" height="160px" class="chartjs-render-monitor"></canvas>
+            </div>
+        </div>
+    </div>
+
+    @* Grafico de Saida *@
+    <div class="col-md-6 col-sm-6">
+        <div class="card">
+            <div class="card-header bg-white mt-2">
+                <h4 class="card-title">Grafico de Saida</h4>
+                <h6 class="card-subtitle text-muted">@Model.Date</h6>
+            </div>
+            <div style="padding: 0px 10px 10px 10px;">
+                <canvas id="chart-pizza-out" height="160px" class="chartjs-render-monitor"></canvas>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@section scripts{
+<script>
+    
+    function getDaysOfMonth(month, year) {
+        var date = new Date(year, month, 1);
+        var days = [0];
+        var day = 0;
+        while (date.getMonth() === month) {
+            day = day + 1;
+            days.push(day);
+            date.setDate(date.getDate() + 1);
+        }
+        return days;
+    }
+
+    function getDaysInMonth(month, year) {
+        var date = new Date(year, month, 1);
+        var days = [];
+        while (date.getMonth() === month) {
+            days.push(new Date(date));
+            date.setDate(date.getDate() + 1);
+        }
+        return days;
+    }
+
+    function getRandomColor() {
+        var o = Math.round;
+        var r = Math.random;
+        var s = 255;
+
+        return 'rgba(' + o(r()*s) + ',' + o(r()*s) + ',' + o(r()*s) + ',' + r().toFixed(1) + ')';
+    } 
+
+    function GraphAreaCashFlow() {
+        $.ajax({
+            url: `/Index?handler=ChartAreaCashFlow`,
+            type: 'POST',
+            headers:  {
+                RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val(),
+            }
+        }).done(function (payload) {
+            
+            var entry = payload.data;
+
+            var date = new Date();
+            const labels = getDaysOfMonth(date.getMonth(), date.getFullYear());
+            const dates = getDaysInMonth(date.getMonth(), date.getFullYear());
+            
+            const cashIn = [0];
+            const cashOut = [0];
+            var cash = 0;
+
+            dates.forEach(function (date) {
+                
+                cash = 0;
+                entry.forEach(function (item) {
+                    if (new Date(date).toLocaleDateString() == new Date(item.date).toLocaleDateString() && item.accountAccrual.type == 1) {
+                        cash += item.value;
+                    }
+                });
+
+                cashIn.push(cash);
+
+                cash = 0;
+                entry.forEach(function (item) {
+                    if (new Date(date).toLocaleDateString() == new Date(item.date).toLocaleDateString() && item.accountAccrual.type == 2) {
+                        cash += item.value;
+                    }
+                });
+                
+                cashOut.push(cash);
+            });
+
+            const data = {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Entrada',
+                        borderColor: 'rgba(45, 206, 137, 1)',
+                        backgroundColor: 'rgba(45, 206, 137, 0.50)',
+                        data: cashIn,
+                    },
+                    {
+                        label: 'Saida',
+                        borderColor: 'rgba(236, 12, 56, 1)',
+                        backgroundColor: 'rgba(236, 12, 56, 0.50)',
+                        data: cashOut,
+                    }
+                ]
+            };
+
+            const config = {
+                type: 'line',
+                data: data,
+                options: {}
+            };
+
+            const chart = new Chart(document.getElementById('chart-area-graph'), config);
+
+        }).fail(function () {
+
+        });
+    }
+
+    function GraphPizzaCashIn() {
+
+        $.ajax({
+            url: `/Index?handler=ChartPizzaCashFlow`,
+            type: 'POST',
+            data: {
+                Type: 'CashInFlow'
+            },
+            headers:  {
+                RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val(),
+            }
+        }).done(function (payload) {
+            const entry = payload.data;
+            console.log(entry);
+        
+            const labels = [];
+            const values = [];
+            const colors = [];
+
+            entry.forEach(function (item) {
+                if (labels.indexOf(item.accountAccrual.description) < 0) {
+                    labels.push(item.accountAccrual.description);
+                }
+            });
+
+            labels.forEach(function (label) {
+                
+                var amount = entry.filter(function (item) {
+                    return item.accountAccrual.description == label;
+                });
+
+                var totalAmount = amount.map(x => x.value).reduce(function (prev, next) {
+                    return prev + next;
+                });
+
+                values.push(totalAmount);
+                colors.push(getRandomColor());
+            });
+
+            const config = {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            data: values,
+                            backgroundColor: colors,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    legend: {
+                        display: true,
+                        position: "bottom",
+                        labels: {
+                            fontColor: "#333",
+                            fontSize: 16
+                        }
+                    }
+                }
+            };
+
+            const chart = new Chart(document.getElementById('chart-pizza-in'), config);
+
+        }).fail(function () {
+
+        });
+    }
+
+    function GraphPizzaCashOut() {
+
+        $.ajax({
+            url: `/Index?handler=ChartPizzaCashFlow`,
+            type: 'POST',
+            data: {
+                Type: 'CashOutFlow'
+            },
+            headers:  {
+                RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val(),
+            }
+        }).done(function (payload) {
+            const entry = payload.data;
+            console.log(entry);
+        
+            const labels = [];
+            const values = [];
+            const colors = [];
+
+            entry.forEach(function (item) {
+                if (labels.indexOf(item.accountAccrual.description) < 0) {
+                    labels.push(item.accountAccrual.description);
+                }
+            });
+
+            labels.forEach(function (label) {
+                
+                var amount = entry.filter(function (item) {
+                    return item.accountAccrual.description == label;
+                });
+
+                var totalAmount = amount.map(x => x.value).reduce(function (prev, next) {
+                    return prev + next;
+                });
+
+                values.push(totalAmount);
+                colors.push(getRandomColor());
+            });
+
+            const config = {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            data: values,
+                            backgroundColor: colors,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    legend: {
+                        display: true,
+                        position: "bottom",
+                        labels: {
+                            fontColor: "#333",
+                            fontSize: 16
+                        }
+                    }
+                }
+            };
+
+            const chart = new Chart(document.getElementById('chart-pizza-out'), config);
+
+        }).fail(function () {
+
+        });
+    }
+
+    $(document).ready(function () {
+        GraphAreaCashFlow();
+        GraphPizzaCashIn();
+        GraphPizzaCashOut();
+    });
+
+
+</script>
+}
